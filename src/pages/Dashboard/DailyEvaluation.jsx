@@ -7,14 +7,36 @@ import confetti from 'canvas-confetti';
 import { Star, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const getToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getDaysArray = () => {
+  const days = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    days.push({
+      dateStr,
+      label: i === 0 ? 'اليوم' : i === 1 ? 'أمس' : d.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'numeric' })
+    });
+  }
+  return days;
+};
+
 const DailyEvaluation = () => {
   const { user } = useAuth();
   const [children, setChildren] = useState([]);
   const [activeChild, setActiveChild] = useState(null);
   const [achievements, setAchievements] = useState([]);
-  const [dailyRecords, setDailyRecords] = useState([]);
   const [weeklyRecords, setWeeklyRecords] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(getToday());
   const [loading, setLoading] = useState(true);
+
+  const dailyRecords = weeklyRecords.filter(r => r.date === selectedDate);
 
   // Audio references
   const cheerAudio = useRef(null);
@@ -33,10 +55,6 @@ const DailyEvaluation = () => {
   }, [activeChild]);
 
   // Use local timezone date to avoid UTC rollover issues
-  const getToday = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
 
   const fetchChildren = async () => {
     try {
@@ -92,19 +110,21 @@ const DailyEvaluation = () => {
       const child = children.find(c => c.id === childId);
       const resetTimestamp = child?.path_reset_timestamp ? new Date(child.path_reset_timestamp) : new Date(0);
       const effectiveStartDate = resetTimestamp > startOfWeek ? resetTimestamp : startOfWeek;
-      const effectiveStartDateStr = `${effectiveStartDate.getFullYear()}-${String(effectiveStartDate.getMonth() + 1).padStart(2, '0')}-${String(effectiveStartDate.getDate()).padStart(2, '0')}`;
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const earliestDate = startOfWeek < sevenDaysAgo ? startOfWeek : sevenDaysAgo;
+      
+      const effectiveFetchDateStr = `${earliestDate.getFullYear()}-${String(earliestDate.getMonth() + 1).padStart(2, '0')}-${String(earliestDate.getDate()).padStart(2, '0')}`;
 
       const { data: recordsData, error: recordsError } = await supabase
         .from('daily_records')
         .select('*')
         .eq('child_id', childId)
-        .gte('date', effectiveStartDateStr);
+        .gte('date', effectiveFetchDateStr);
       
       if (recordsError) throw recordsError;
       
       setWeeklyRecords(recordsData || []);
-      const today = getToday();
-      setDailyRecords((recordsData || []).filter(r => r.date === today));
       
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -138,11 +158,10 @@ const DailyEvaluation = () => {
   };
 
   const handleEvaluate = async (achievementId, status) => {
-    const today = getToday();
     const recordsForThisAchievement = dailyRecords.filter(r => r.achievement_id === achievementId);
     
     if (recordsForThisAchievement.length >= 5) {
-      alert('الحد الأقصى هو 5 تقييمات لهذا الإنجاز اليوم.');
+      alert('الحد الأقصى هو 5 تقييمات لهذا الإنجاز في اليوم.');
       return;
     }
 
@@ -150,7 +169,7 @@ const DailyEvaluation = () => {
       const newRecord = {
         child_id: activeChild.id,
         achievement_id: achievementId,
-        date: today,
+        date: selectedDate,
         status: status
       };
 
@@ -166,7 +185,6 @@ const DailyEvaluation = () => {
       }
 
       if (data && data.length > 0) {
-        setDailyRecords(prev => [...prev, data[0]]);
         setWeeklyRecords(prev => [...prev, data[0]]);
       } else {
         // Fallback
@@ -197,7 +215,6 @@ const DailyEvaluation = () => {
          alert('خطأ في التراجع: ' + error.message);
          return;
       }
-      setDailyRecords(prev => prev.filter(r => r.id !== recordId));
       setWeeklyRecords(prev => prev.filter(r => r.id !== recordId));
     } catch (error) {
       alert('حدث خطأ غير متوقع: ' + error.message);
@@ -286,6 +303,23 @@ const DailyEvaluation = () => {
                   )}
                 </div>
                 {child.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Date Selector */}
+          <div className="flex overflow-x-auto gap-2 pb-2 snap-x scrollbar-hide my-4" dir="rtl">
+            {getDaysArray().map((dayObj) => (
+              <button
+                key={dayObj.dateStr}
+                onClick={() => setSelectedDate(dayObj.dateStr)}
+                className={`flex-none snap-start px-4 py-2 rounded-full font-bold transition-all text-sm border-2 ${
+                  selectedDate === dayObj.dateStr
+                    ? 'border-[#f0a63e] bg-[#f0a63e] text-white shadow-md scale-105'
+                    : 'border-[#e2d5cc] bg-white text-[#a99c92] hover:border-[#f0a63e]/50'
+                }`}
+              >
+                {dayObj.label}
               </button>
             ))}
           </div>
