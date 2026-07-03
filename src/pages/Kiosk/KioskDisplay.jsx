@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const getWindowDays = () => {
   const days = [];
   const today = new Date();
-  for (let i = -3; i <= 3; i++) {
+  for (let i = -6; i <= 0; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
     const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
