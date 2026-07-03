@@ -411,7 +411,12 @@ const KioskDisplay = () => {
 
                 {/* الميدالية / الهدف */}
                 <motion.div 
-                  className="h-[clamp(4rem,10vh,6rem)] aspect-square md:h-[clamp(5rem,12vh,8rem)] bg-white rounded-full p-1 md:p-1.5 shadow-md border-2 md:border-4 border-[#f0a63e] flex items-center justify-center shrink-0"
+                  onClick={() => {
+                    if (isCompleted) {
+                      setHiddenCelebrations(prev => ({ ...prev, [activeChild.id]: false }));
+                    }
+                  }}
+                  className={`h-[clamp(4rem,10vh,6rem)] aspect-square md:h-[clamp(5rem,12vh,8rem)] bg-white rounded-full p-1 md:p-1.5 shadow-md border-2 md:border-4 border-[#f0a63e] flex items-center justify-center shrink-0 ${isCompleted ? 'cursor-pointer hover:scale-125 transition-transform' : ''}`}
                   initial={false}
                   animate={{
                     scale: isCompleted ? 1.15 : 1,
