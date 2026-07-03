@@ -416,14 +416,17 @@ const KioskDisplay = () => {
                       setHiddenCelebrations(prev => ({ ...prev, [activeChild.id]: false }));
                     }
                   }}
-                  className={`h-[clamp(4rem,10vh,6rem)] aspect-square md:h-[clamp(5rem,12vh,8rem)] bg-white rounded-full p-1 md:p-1.5 shadow-md border-2 md:border-4 border-[#f0a63e] flex items-center justify-center shrink-0 ${isCompleted ? 'cursor-pointer hover:scale-125 transition-transform' : ''}`}
+                  className={`h-[clamp(4rem,10vh,6rem)] aspect-square md:h-[clamp(5rem,12vh,8rem)] bg-white rounded-full p-1 md:p-1.5 shadow-md border-2 md:border-4 flex items-center justify-center shrink-0 ${isCompleted ? 'cursor-pointer hover:scale-125' : ''}`}
                   initial={false}
                   animate={{
-                    scale: isCompleted ? 1.15 : 1,
+                    scale: isCompleted ? [1.15, 1.25, 1.15] : [1, 1.1, 1],
                     borderColor: isCompleted ? '#488b40' : '#f0a63e',
                     boxShadow: isCompleted ? '0 10px 25px -5px rgba(72,139,64,0.4)' : '0 4px 6px -1px rgba(0,0,0,0.1)'
                   }}
-                  transition={{ type: "spring", stiffness: 50, damping: 10 }}
+                  transition={{ 
+                    scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                    default: { type: "spring", stiffness: 50, damping: 10 }
+                  }}
                 >
                   <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
                 </motion.div>
