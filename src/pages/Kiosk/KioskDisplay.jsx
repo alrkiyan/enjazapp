@@ -331,119 +331,142 @@ const KioskDisplay = () => {
           transition={{ duration: 0.8, ease: "easeInOut" }}
           className="flex-1 w-full flex flex-col bg-white rounded-[3rem] shadow-2xl p-3 md:p-6 border-8 border-[#ffffff]/50 overflow-hidden min-h-0"
         >
-          {/* Header - بيانات الابن (بشكل أفقي لتوفير المساحة العمودية) */}
-          <div className="flex flex-row items-center justify-between w-full mb-2 md:mb-4 shrink-0 h-[12vh] max-h-32 px-2 md:px-8 gap-4 md:gap-8">
-            <div className="flex items-center gap-4 md:gap-6 h-full shrink-0">
-              <div className="h-full aspect-square rounded-full border-4 border-[#faece3] bg-[#f0e6de] overflow-hidden flex items-center justify-center shadow-lg relative">
-                {activeChild.avatar_url ? (
-                  <img src={activeChild.avatar_url} alt={activeChild.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[clamp(2rem,8vh,5rem)] text-[#a99c92]">{activeChild.name.charAt(0)}</span>
-                )}
-              </div>
-              <h1 className="text-[clamp(1.5rem,5vh,4rem)] font-black text-[#352c3c] drop-shadow-sm whitespace-nowrap">{activeChild.name}</h1>
+          {isCompleted ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-8 md:gap-12 w-full h-full p-4 animate-fade-in relative z-10">
+               <motion.div 
+                 initial={{ scale: 0, rotate: -180 }}
+                 animate={{ scale: 1, rotate: 0 }}
+                 transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                 className="w-[clamp(15rem,40vh,25rem)] aspect-square bg-white rounded-full p-4 shadow-2xl border-8 md:border-[12px] border-[#f0a63e] flex items-center justify-center overflow-hidden"
+               >
+                 <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
+               </motion.div>
+               <div className="flex flex-col items-center text-center gap-4">
+                 <h2 className="text-[clamp(2.5rem,8vh,5rem)] font-black text-[#f0a63e] drop-shadow-md">
+                   مبرووووووك 🥳
+                 </h2>
+                 <h3 className="text-[clamp(1.8rem,5vh,3.5rem)] font-bold text-[#352c3c] leading-tight">
+                   لقد حققت الهدف يا <span className="text-[#49b5d0]">{activeChild.name}</span> 🎉🎊
+                 </h3>
+               </div>
             </div>
+          ) : (
+            <>
+              {/* Header - بيانات الابن (بشكل أفقي لتوفير المساحة العمودية) */}
+              <div className="flex flex-row items-center justify-between w-full mb-2 md:mb-4 shrink-0 h-[12vh] max-h-32 px-2 md:px-8 gap-4 md:gap-8">
+                <div className="flex items-center gap-4 md:gap-6 h-full shrink-0">
+                  <div className="h-full aspect-square rounded-full border-4 border-[#faece3] bg-[#f0e6de] overflow-hidden flex items-center justify-center shadow-lg relative">
+                    {activeChild.avatar_url ? (
+                      <img src={activeChild.avatar_url} alt={activeChild.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[clamp(2rem,8vh,5rem)] text-[#a99c92]">{activeChild.name.charAt(0)}</span>
+                    )}
+                  </div>
+                  <h1 className="text-[clamp(1.5rem,5vh,4rem)] font-black text-[#352c3c] drop-shadow-sm whitespace-nowrap">{activeChild.name}</h1>
+                </div>
 
-            {/* مسار الإنجاز */}
-            <div className="flex-1 flex flex-col justify-center h-full relative">
-              <div className="flex justify-between items-end mb-2 md:mb-4 px-2">
-                <span className="text-[clamp(0.8rem,2vh,1.2rem)] font-bold text-[#f0a63e]">مسار الإنجاز</span>
-                <span className="text-[clamp(1rem,2.5vh,1.5rem)] font-bold text-[#a99c92]">{progress} / {weeklyGoal}</span>
-              </div>
-              <div className="relative w-full h-4 md:h-6 bg-[#f0e6de] rounded-full border-2 border-[#e2d5cc]">
-                
-                {/* خط التقدم */}
-                <motion.div 
-                  className="absolute top-0 right-0 h-full bg-gradient-to-l from-[#f0a63e] to-[#f4c88a] rounded-full"
-                  initial={false}
-                  animate={{ width: `${progressPercentage}%` }}
-                  transition={{ type: "spring", stiffness: 50, damping: 10 }}
-                />
+                {/* مسار الإنجاز */}
+                <div className="flex-1 flex flex-col justify-center h-full relative">
+                  <div className="flex justify-between items-end mb-2 md:mb-4 px-2">
+                    <span className="text-[clamp(0.8rem,2vh,1.2rem)] font-bold text-[#f0a63e]">مسار الإنجاز</span>
+                    <span className="text-[clamp(1rem,2.5vh,1.5rem)] font-bold text-[#a99c92]">{progress} / {weeklyGoal}</span>
+                  </div>
+                  <div className="relative w-full h-4 md:h-6 bg-[#f0e6de] rounded-full border-2 border-[#e2d5cc]">
+                    
+                    {/* خط التقدم */}
+                    <motion.div 
+                      className="absolute top-0 right-0 h-full bg-gradient-to-l from-[#f0a63e] to-[#f4c88a] rounded-full"
+                      initial={false}
+                      animate={{ width: `${progressPercentage}%` }}
+                      transition={{ type: "spring", stiffness: 50, damping: 10 }}
+                    />
 
-                {/* الأرنب */}
+                    {/* الأرنب */}
+                    <motion.div 
+                      className="absolute top-1/2 z-10 w-[clamp(2.5rem,6vh,4.5rem)] h-[clamp(2.5rem,6vh,4.5rem)] md:w-[clamp(3rem,7vh,5rem)] md:h-[clamp(3rem,7vh,5rem)]"
+                      initial={false}
+                      animate={{ 
+                        right: `${progressPercentage}%`,
+                        x: '50%',
+                        y: '-50%',
+                        opacity: isCompleted ? 0 : 1,
+                        scale: isCompleted ? 0.5 : 1
+                      }}
+                      transition={{ type: "spring", stiffness: 50, damping: 10 }}
+                    >
+                      <img src="/assets/img/Rabbit Kick Scooter.svg" alt="Rabbit" className="w-full h-full object-contain drop-shadow-md" style={{ transform: 'scaleX(-1)' }} />
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* الميدالية / الهدف */}
                 <motion.div 
-                  className="absolute top-1/2 z-10 w-[clamp(2.5rem,6vh,4.5rem)] h-[clamp(2.5rem,6vh,4.5rem)] md:w-[clamp(3rem,7vh,5rem)] md:h-[clamp(3rem,7vh,5rem)]"
+                  className="h-[clamp(4rem,10vh,6rem)] aspect-square md:h-[clamp(5rem,12vh,8rem)] bg-white rounded-full p-1 md:p-1.5 shadow-md border-2 md:border-4 border-[#f0a63e] flex items-center justify-center shrink-0"
                   initial={false}
-                  animate={{ 
-                    right: `${progressPercentage}%`,
-                    x: '50%',
-                    y: '-50%',
-                    opacity: isCompleted ? 0 : 1,
-                    scale: isCompleted ? 0.5 : 1
+                  animate={{
+                    scale: isCompleted ? 1.15 : 1,
+                    borderColor: isCompleted ? '#488b40' : '#f0a63e',
+                    boxShadow: isCompleted ? '0 10px 25px -5px rgba(72,139,64,0.4)' : '0 4px 6px -1px rgba(0,0,0,0.1)'
                   }}
                   transition={{ type: "spring", stiffness: 50, damping: 10 }}
                 >
-                  <img src="/assets/img/Rabbit Kick Scooter.svg" alt="Rabbit" className="w-full h-full object-contain drop-shadow-md" style={{ transform: 'scaleX(-1)' }} />
+                  <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
                 </motion.div>
               </div>
-            </div>
 
-            {/* الميدالية / الهدف */}
-            <motion.div 
-              className="h-[clamp(4rem,10vh,6rem)] aspect-square md:h-[clamp(5rem,12vh,8rem)] bg-white rounded-full p-1 md:p-1.5 shadow-md border-2 md:border-4 border-[#f0a63e] flex items-center justify-center shrink-0"
-              initial={false}
-              animate={{
-                scale: isCompleted ? 1.15 : 1,
-                borderColor: isCompleted ? '#488b40' : '#f0a63e',
-                boxShadow: isCompleted ? '0 10px 25px -5px rgba(72,139,64,0.4)' : '0 4px 6px -1px rgba(0,0,0,0.1)'
-              }}
-              transition={{ type: "spring", stiffness: 50, damping: 10 }}
-            >
-              <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
-            </motion.div>
-          </div>
-
-          {/* Table - جدول الإنجازات */}
-          <div className="flex-1 w-full bg-[#faece3]/30 rounded-3xl p-2 overflow-hidden shadow-inner flex flex-col border border-[#e2d5cc] min-h-0">
-            {activeAchievements.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-3xl font-bold text-[#a99c92]">لا يوجد إنجازات مسندة لهذا الابن.</div>
-            ) : (
-              <div className="flex flex-col w-full h-full text-center gap-2 min-h-0">
-                {/* Header Row */}
-                <div className="flex w-full h-[8vh] max-h-16 shrink-0 gap-1 md:gap-2 mb-2 @container">
-                  <div className="w-[20%] md:w-1/4 shrink-0"></div>
-                  {daysWindow.map((day, idx) => (
-                    <div key={idx} className="flex-1 min-w-0 h-full">
-                      <div className={`h-full flex flex-col items-center justify-center px-1 rounded-xl transition-all ${day.isToday ? 'bg-[#49b5d0] text-white shadow-md scale-[1.02]' : 'bg-white text-[#a99c92] shadow-sm'}`}>
-                        <span className="text-[clamp(0.7rem,30cqh,1.2rem)] font-black leading-tight truncate w-full px-1 text-center">{day.name}</span>
-                        <span className="text-[clamp(0.6rem,25cqh,1rem)] font-bold opacity-80">{day.date.split('-').slice(1).reverse().join('/')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Body Rows */}
-                <div className="flex-1 flex flex-col w-full gap-1 min-h-0">
-                  {activeAchievements.map(ach => (
-                    <div key={ach.id} className="flex-1 flex w-full gap-1 md:gap-2 group min-h-0 @container">
-                      
-                      {/* Achievement Title Card */}
-                      <div className="w-[25%] md:w-1/4 shrink-0 h-full p-0.5 md:p-1">
-                        <div className="h-full bg-white rounded-xl md:rounded-2xl p-1 md:px-3 shadow-sm border-2 border-transparent group-hover:border-[#f0a63e] transition-colors flex flex-row items-center justify-start gap-1.5 md:gap-3 overflow-hidden">
-                           {ach.icon_url ? (
-                             <img src={ach.icon_url} alt={ach.title} className="h-[75%] max-h-[2.5rem] aspect-square object-contain shrink-0" />
-                           ) : (
-                             <Star className="h-[75%] max-h-[2.5rem] aspect-square text-[#f0a63e] shrink-0" />
-                           )}
-                           <span className="font-bold text-[clamp(0.65rem,3.5cqh,1.1rem)] text-[#352c3c] line-clamp-2 leading-tight text-right flex-1 min-w-0 break-words">{ach.title}</span>
-                        </div>
-                      </div>
-
-                      {/* Day Cells */}
+              {/* Table - جدول الإنجازات */}
+              <div className="flex-1 w-full bg-[#faece3]/30 rounded-3xl p-2 overflow-hidden shadow-inner flex flex-col border border-[#e2d5cc] min-h-0">
+                {activeAchievements.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-3xl font-bold text-[#a99c92]">لا يوجد إنجازات مسندة لهذا الابن.</div>
+                ) : (
+                  <div className="flex flex-col w-full h-full text-center gap-2 min-h-0">
+                    {/* Header Row */}
+                    <div className="flex w-full h-[8vh] max-h-16 shrink-0 gap-1 md:gap-2 mb-2 @container">
+                      <div className="w-[20%] md:w-1/4 shrink-0"></div>
                       {daysWindow.map((day, idx) => (
-                        <div key={idx} className="flex-1 min-w-0 h-full p-0.5 md:p-1">
-                          <div className={`h-full w-full flex items-center justify-center p-1 rounded-xl ${day.isToday ? 'bg-white/60 border-2 border-[#49b5d0]/30' : 'bg-transparent'} transition-all overflow-hidden`}>
-                            {renderCellMarks(ach.id, day.date)}
+                        <div key={idx} className="flex-1 min-w-0 h-full">
+                          <div className={`h-full flex flex-col items-center justify-center px-1 rounded-xl transition-all ${day.isToday ? 'bg-[#49b5d0] text-white shadow-md scale-[1.02]' : 'bg-white text-[#a99c92] shadow-sm'}`}>
+                            <span className="text-[clamp(0.7rem,30cqh,1.2rem)] font-black leading-tight truncate w-full px-1 text-center">{day.name}</span>
+                            <span className="text-[clamp(0.6rem,25cqh,1rem)] font-bold opacity-80">{day.date.split('-').slice(1).reverse().join('/')}</span>
                           </div>
                         </div>
                       ))}
-
                     </div>
-                  ))}
-                </div>
+                    
+                    {/* Body Rows */}
+                    <div className="flex-1 flex flex-col w-full gap-1 min-h-0">
+                      {activeAchievements.map(ach => (
+                        <div key={ach.id} className="flex-1 flex w-full gap-1 md:gap-2 group min-h-0 @container">
+                          
+                          {/* Achievement Title Card */}
+                          <div className="w-[25%] md:w-1/4 shrink-0 h-full p-0.5 md:p-1">
+                            <div className="h-full bg-white rounded-xl md:rounded-2xl p-1 md:px-3 shadow-sm border-2 border-transparent group-hover:border-[#f0a63e] transition-colors flex flex-row items-center justify-start gap-1.5 md:gap-3 overflow-hidden">
+                              {ach.icon_url ? (
+                                <img src={ach.icon_url} alt={ach.title} className="h-[75%] max-h-[2.5rem] aspect-square object-contain shrink-0" />
+                              ) : (
+                                <Star className="h-[75%] max-h-[2.5rem] aspect-square text-[#f0a63e] shrink-0" />
+                              )}
+                              <span className="font-bold text-[clamp(0.65rem,3.5cqh,1.1rem)] text-[#352c3c] line-clamp-2 leading-tight text-right flex-1 min-w-0 break-words">{ach.title}</span>
+                            </div>
+                          </div>
+
+                          {/* Day Cells */}
+                          {daysWindow.map((day, idx) => (
+                            <div key={idx} className="flex-1 min-w-0 h-full p-0.5 md:p-1">
+                              <div className={`h-full w-full flex items-center justify-center p-1 rounded-xl ${day.isToday ? 'bg-white/60 border-2 border-[#49b5d0]/30' : 'bg-transparent'} transition-all overflow-hidden`}>
+                                {renderCellMarks(ach.id, day.date)}
+                              </div>
+                            </div>
+                          ))}
+
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {/* شريط التقدم بأسفل الشاشة */}
           {children.length > 1 && (
