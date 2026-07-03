@@ -28,6 +28,7 @@ const KioskDisplay = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [daysWindow, setDaysWindow] = useState(getWindowDays());
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const [hiddenCelebrations, setHiddenCelebrations] = useState({});
 
   const cheerAudio = useRef(null);
   const sadAudio = useRef(null);
@@ -74,6 +75,7 @@ const KioskDisplay = () => {
         // نتحقق إذا كان هذا التقييم لأحد أطفالنا باستخدام المرجع لتجنب مشاكل حالة React
         const isOurChild = childrenRef.current.some(c => c.id === payload.new.child_id);
         if (isOurChild) {
+          setHiddenCelebrations(prev => ({ ...prev, [payload.new.child_id]: false }));
           setRecords(prev => {
             // منع التكرار في حال تم استدعاء الحدث مرتين
             if (prev.some(r => r.id === payload.new.id)) return prev;
@@ -273,6 +275,7 @@ const KioskDisplay = () => {
   const weeklyGoal = activeChild.weekly_star_goal || 10;
   const progressPercentage = Math.min(100, Math.max(0, (progress / weeklyGoal) * 100));
   const isCompleted = progressPercentage >= 100;
+  const showCelebration = isCompleted && !hiddenCelebrations[activeChild.id];
 
   // رسوميات الجدول
   const renderCellMarks = (achievementId, dateString) => {
@@ -331,8 +334,15 @@ const KioskDisplay = () => {
           transition={{ duration: 0.8, ease: "easeInOut" }}
           className="flex-1 w-full flex flex-col bg-white rounded-[3rem] shadow-2xl p-3 md:p-6 border-8 border-[#ffffff]/50 overflow-hidden min-h-0"
         >
-          {isCompleted ? (
+          {showCelebration ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-8 md:gap-12 w-full h-full p-4 animate-fade-in relative z-10">
+               <button 
+                 onClick={() => setHiddenCelebrations(prev => ({ ...prev, [activeChild.id]: true }))}
+                 className="absolute top-4 left-4 p-3 bg-white/80 hover:bg-white rounded-full shadow-lg border-2 border-[#e2d5cc] transition-all z-20 group"
+                 title="إخفاء التهنئة وعرض الجدول"
+               >
+                 <X size={28} className="text-[#a99c92] group-hover:text-[#c15b40]" />
+               </button>
                <motion.div 
                  initial={{ scale: 0, rotate: -180 }}
                  animate={{ scale: 1, rotate: 0 }}
