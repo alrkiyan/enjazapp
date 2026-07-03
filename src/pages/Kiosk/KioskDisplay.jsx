@@ -154,15 +154,22 @@ const KioskDisplay = () => {
         .in('child_id', childIds);
       if (linkErr) throw linkErr;
 
-      // جلب التقييمات للـ 7 أيام
-      const startDate = daysWindow[0].date;
+      // جلب التقييمات للـ 7 أيام أو من بداية الأسبوع
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const windowStartDate = new Date(daysWindow[0].date);
+      const fetchStartDate = startOfWeek < windowStartDate ? startOfWeek : windowStartDate;
+      const startDateStr = `${fetchStartDate.getFullYear()}-${String(fetchStartDate.getMonth() + 1).padStart(2, '0')}-${String(fetchStartDate.getDate()).padStart(2, '0')}`;
+      
       const endDate = daysWindow[daysWindow.length - 1].date;
 
       const { data: recordsData, error: recErr } = await supabase
         .from('daily_records')
         .select('*')
         .in('child_id', childIds)
-        .gte('date', startDate)
+        .gte('date', startDateStr)
         .lte('date', endDate);
       
       if (recErr) throw recErr;
