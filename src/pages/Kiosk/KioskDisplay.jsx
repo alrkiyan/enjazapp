@@ -485,8 +485,8 @@ const KioskDisplay = () => {
       </AnimatePresence>
 
       {/* حقوق التطوير */}
-      <div className="shrink-0 text-center text-[#a99c92] text-[clamp(0.8rem,1.5vw,1.2rem)] mt-2 font-bold z-10">
-        تم التطوير بحب من قبل <a href="https://ruman.sa" target="_blank" rel="noopener noreferrer" className="text-[#49b5d0] hover:text-[#f0a63e] transition-colors">وكالة رمان</a>
+      <div className="shrink-0 text-center text-[#a99c92] text-[clamp(0.8rem,1.5vw,1.2rem)] mt-2 font-bold z-10" dir="ltr">
+        Made with ♥️ By <a href="https://bysaleh.dev" target="_blank" rel="noopener noreferrer" className="text-[#49b5d0] hover:text-[#f0a63e] transition-colors">Saleh</a>
       </div>
 
     </div>
