@@ -38,20 +38,9 @@
 
 ## المرحلة B2 — تطبيق مخطط قاعدة البيانات (المستضاف فارغ)
 
-افتح **Supabase Studio** الخاص بك (من Coolify) → **SQL Editor**، وشغّل ملفات مجلد `supabase/` **بهذا الترتيب تماماً** (كل ملف على حدة):
+افتح **Supabase Studio** الخاص بك (من Coolify) → **SQL Editor**، وشغّل الملف الموحّد **`supabase/schema.sql`** مرة واحدة. يحتوي كل شيء: الجداول، RLS، السياسات، الدوال والـTriggers، التخزين (حاوية `uploads`)، دوال السوبر أدمن، وتفعيل Realtime لكل الجداول الخمسة.
 
-1. `schema.sql` — الجداول الأساسية الأربعة + RLS + دالة `handle_new_user()` + إنشاء النشر `supabase_realtime`
-2. `phase5_schema.sql` — جدول `kiosk_sessions` + إضافته للنشر
-3. `storage_and_fixes.sql` — حاوية التخزين `uploads` + سياساتها
-4. `admin_functions.sql` — دوال الأدمن الثلاث (شغّلها كـ `postgres`)
-5. `allow_kiosk_reads.sql` — سياسات قراءة الشاشة (anon)
-6. `add_path_fields.sql`
-7. `add_reward_image.sql`
-8. `add_device_info_to_kiosk.sql`
-9. `update_daily_records.sql`
-10. `fix_kiosk_delete.sql`
-
-> ❌ **لا تشغّل** `supabase/create_super_admin.sql` — حساب الأدمن سيأتي مع استيراد البيانات في المرحلة B3.
+> ℹ️ في نهاية الملف قسمٌ اختياري (القسم 8) لإنشاء سوبر أدمن افتراضي (`saleh@isaleh.dev`). **تخطَّ هذا القسم إذا كنت ستستورد بياناتك الموجودة** في B3 (سيأتي الأدمن معها) — إمّا احذفه قبل التشغيل أو تجاهله (فهو محميّ بشرط «إن لم يكن الإيميل موجوداً»).
 
 ### تأكيدات بعد التطبيق
 
