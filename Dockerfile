@@ -12,9 +12,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build args for Vite env vars (baked in at build time)
+# Build args for Vite env vars (baked in at build time).
+# In Coolify: set these two as env vars and tick "Build Variable" so they are
+# passed as --build-args. Convert ARG -> ENV so `vite build` (which reads
+# process.env for VITE_* keys) actually picks them up.
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 # Build the app
 RUN npm run build
