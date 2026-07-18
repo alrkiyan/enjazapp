@@ -257,6 +257,150 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
+-- 5b) دوال الإحصائيات
+-- ============================================================================
+
+-- إحصائيات المنصة الكاملة (سوبر أدمن فقط)
+CREATE OR REPLACE FUNCTION public.admin_get_platform_stats()
+RETURNS JSON AS $$
+DECLARE
+  result JSON;
+BEGIN
+  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  SELECT json_build_object(
+    'families_count', (
+      SELECT COUNT(*) FROM auth.users
+      WHERE (raw_user_meta_data->>'is_super_admin')::boolean IS NOT TRUE
+    ),
+    'total_achievements', (SELECT COUNT(*) FROM public.achievements),
+    'total_kiosks',       (SELECT COUNT(*) FROM public.kiosk_sessions),
+    'families', (
+      SELECT COALESCE(json_agg(
+        json_build_object(
+          'id',                u.id,
+          'email',             u.email,
+          'last_sign_in_at',   u.last_sign_in_at,
+          'created_at',        u.created_at,
+          'children_count',    (SELECT COUNT(*) FROM public.children c  WHERE c.parent_id  = u.id),
+          'achievements_count',(SELECT COUNT(*) FROM public.achievements a WHERE a.parent_id = u.id),
+          'children', (
+            SELECT COALESCE(json_agg(
+              json_build_object('id', c2.id, 'name', c2.name)
+              ORDER BY c2.created_at
+            ), '[]'::json)
+            FROM public.children c2 WHERE c2.parent_id = u.id
+          ),
+          'kiosks', (
+            SELECT COALESCE(json_agg(
+              json_build_object('id', ks.id, 'device_info', ks.device_info, 'created_at', ks.created_at)
+              ORDER BY ks.created_at DESC
+            ), '[]'::json)
+            FROM public.kiosk_sessions ks WHERE ks.parent_id = u.id
+          )
+        ) ORDER BY u.created_at DESC
+      ), '[]'::json)
+      FROM auth.users u
+      WHERE (u.raw_user_meta_data->>'is_super_admin')::boolean IS NOT TRUE
+    )
+  ) INTO result;
+
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- فك ربط شاشة بواسطة السوبر أدمن
+CREATE OR REPLACE FUNCTION public.admin_unlink_kiosk(session_id UUID)
+RETURNS void AS $$
+BEGIN
+  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  DELETE FROM public.kiosk_sessions WHERE id = session_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'الجلسة غير موجودة.';
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- إحصائيات الأبناء للوالد الحالي
+CREATE OR REPLACE FUNCTION public.get_parent_child_stats()
+RETURNS JSON AS $$
+DECLARE
+  result JSON;
+  v_uid  UUID := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT COALESCE(json_agg(
+    json_build_object(
+      'id',                   c.id,
+      'name',                 c.name,
+      'avatar_url',           c.avatar_url,
+      'weekly_star_goal',     COALESCE(c.weekly_star_goal, 10),
+      'path_reset_timestamp', c.path_reset_timestamp,
+      -- إجمالي النجوم والعلامات لهذا الابن
+      'total_stars',   (SELECT COUNT(*) FROM public.daily_records dr WHERE dr.child_id = c.id AND dr.status = 'star'),
+      'total_crosses', (SELECT COUNT(*) FROM public.daily_records dr WHERE dr.child_id = c.id AND dr.status = 'cross'),
+      'last_star_date',(SELECT MAX(dr.date) FROM public.daily_records dr WHERE dr.child_id = c.id AND dr.status = 'star'),
+      -- عدد المرات التي وصل فيها الابن للهدف الأسبوعي (تصفير)
+      'path_completions', (
+        SELECT COUNT(*)
+        FROM (
+          SELECT
+            (DATE_TRUNC('week', dr2.date::timestamp + INTERVAL '1 day') - INTERVAL '1 day')::date AS week_sun,
+            SUM(CASE WHEN dr2.status = 'star'  THEN 1 ELSE 0 END) -
+            SUM(CASE WHEN dr2.status = 'cross' THEN 1 ELSE 0 END) AS net_stars
+          FROM public.daily_records dr2
+          WHERE dr2.child_id = c.id
+          GROUP BY week_sun
+          HAVING (
+            SUM(CASE WHEN dr2.status = 'star'  THEN 1 ELSE 0 END) -
+            SUM(CASE WHEN dr2.status = 'cross' THEN 1 ELSE 0 END)
+          ) >= COALESCE(c.weekly_star_goal, 10)
+        ) weeks_achieved
+      ),
+      -- إنجازات الابن مع إحصائياتها، مرتبة تنازلياً بعدد النجوم
+      'achievements', (
+        SELECT COALESCE(json_agg(
+          json_build_object(
+            'id',           a.id,
+            'title',        a.title,
+            'icon_url',     a.icon_url,
+            'total_stars',  COALESCE(ach_s.stars,   0),
+            'total_crosses',COALESCE(ach_s.crosses,  0),
+            'last_star_date', ach_s.last_star
+          ) ORDER BY COALESCE(ach_s.stars, 0) DESC
+        ), '[]'::json)
+        FROM public.child_achievements ca
+        JOIN public.achievements a ON a.id = ca.achievement_id
+        LEFT JOIN LATERAL (
+          SELECT
+            SUM(CASE WHEN dr3.status = 'star'  THEN 1 ELSE 0 END) AS stars,
+            SUM(CASE WHEN dr3.status = 'cross' THEN 1 ELSE 0 END) AS crosses,
+            MAX(CASE WHEN dr3.status = 'star'  THEN dr3.date END)  AS last_star
+          FROM public.daily_records dr3
+          WHERE dr3.child_id = c.id AND dr3.achievement_id = a.id
+        ) ach_s ON true
+        WHERE ca.child_id = c.id
+      )
+    ) ORDER BY c.created_at ASC
+  ), '[]'::json)
+  INTO result
+  FROM public.children c
+  WHERE c.parent_id = v_uid;
+
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
 -- 6) التخزين (Storage) — حاوية uploads العامة + سياساتها
 -- ============================================================================
 INSERT INTO storage.buckets (id, name, public)
