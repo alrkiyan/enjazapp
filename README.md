@@ -70,7 +70,7 @@
 
 ### 1. استنساخ المستودع وتثبيت الحزم:
 ```bash
-git clone https://github.com/rumanagency/enjazyapp.git
+git clone https://github.com/alrkiyan/enjazapp.git
 cd enjazyapp
 npm install
 ```
