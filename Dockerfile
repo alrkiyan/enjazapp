@@ -39,8 +39,11 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Expose port 80
 EXPOSE 80
 
-# Health check
+# Health check.
+# Use 127.0.0.1 (not "localhost") to force IPv4: the custom nginx.conf listens
+# on IPv4 only, while "localhost" resolves to IPv6 (::1) first -> connection
+# refused, which made Coolify mark the container unhealthy and roll back.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
