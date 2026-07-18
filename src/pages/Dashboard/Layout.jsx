@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Users, Star, LogOut, LayoutDashboard, CalendarCheck, MonitorPlay } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import ForceChangePassword from '../../components/ui/ForceChangePassword';
 
 const DashboardLayout = () => {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
+  const [passwordChanged, setPasswordChanged] = useState(false);
+
+  const mustChangePassword =
+    !passwordChanged && user?.user_metadata?.must_change_password === true;
 
   const handleSignOut = async () => {
     await signOut();
@@ -28,6 +33,11 @@ const DashboardLayout = () => {
 
   return (
     <div className="min-h-screen bg-[#faece3] flex flex-col md:flex-row">
+      {/* مودال إجبار تغيير كلمة المرور عند أول دخول */}
+      {mustChangePassword && (
+        <ForceChangePassword onDone={() => setPasswordChanged(true)} />
+      )}
+
       {/* Sidebar / Topbar */}
       <aside className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-l border-[#f0e6de] flex flex-col shadow-[0_8px_30px_rgb(0,0,0,0.04)] z-10">
         <div className="p-6 flex flex-col items-center justify-center text-center border-b border-[#f0e6de]">

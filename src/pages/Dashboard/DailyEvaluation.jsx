@@ -257,11 +257,16 @@ const DailyEvaluation = () => {
   const resetTimestampDisplay = activeChild?.path_reset_timestamp ? new Date(activeChild.path_reset_timestamp) : new Date(0);
   const effectiveStartDateDisplay = resetTimestampDisplay > startOfWeekDisplay ? resetTimestampDisplay : startOfWeekDisplay;
 
+  // تحويل تاريخ البداية الفعلي إلى نص بتنسيق YYYY-MM-DD للمقارنة مع عمود date في قاعدة البيانات
+  const toDateStr = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const effectiveStartStr = toDateStr(effectiveStartDateDisplay);
+
   let validStars = 0;
   let validCrosses = 0;
   weeklyRecords.forEach(r => {
-    const recordTime = r.created_at ? new Date(r.created_at) : new Date(r.date);
-    if (recordTime >= effectiveStartDateDisplay) {
+    // المقارنة بعمود date (نص YYYY-MM-DD) لضمان التطابق مع شاشة Kiosk
+    if (r.date >= effectiveStartStr) {
       if (r.status === 'star') validStars++;
       else if (r.status === 'cross') validCrosses++;
     }

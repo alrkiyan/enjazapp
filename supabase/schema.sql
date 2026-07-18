@@ -224,6 +224,38 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- تغيير كلمة مرور مستخدم (من قِبَل السوبر أدمن)
+CREATE OR REPLACE FUNCTION public.admin_change_user_password(target_uid UUID, new_password TEXT)
+RETURNS void AS $$
+BEGIN
+  -- التحقق من صلاحية السوبر أدمن
+  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  -- لا يُسمح بتغيير كلمة مرور السوبر أدمن نفسه عبر هذه الدالة
+  IF target_uid = auth.uid() THEN
+    RAISE EXCEPTION 'استخدم خيار "تغيير كلمة المرور" في إعدادات حسابك الشخصي.';
+  END IF;
+
+  -- التحقق من الحد الأدنى لطول كلمة المرور
+  IF length(new_password) < 6 THEN
+    RAISE EXCEPTION 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.';
+  END IF;
+
+  -- تحديث كلمة المرور المشفّرة مباشرةً في جدول auth.users
+  UPDATE auth.users
+  SET
+    encrypted_password = crypt(new_password, gen_salt('bf')),
+    updated_at = now()
+  WHERE id = target_uid;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'المستخدم غير موجود.';
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ============================================================================
 -- 6) التخزين (Storage) — حاوية uploads العامة + سياساتها
 -- ============================================================================
