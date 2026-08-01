@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5171 --strictPort --host",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --port 5171"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

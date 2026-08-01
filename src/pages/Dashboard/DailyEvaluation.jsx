@@ -100,20 +100,12 @@ const DailyEvaluation = () => {
       }
       setAchievements(achData);
 
-      const getStartOfWeek = () => {
-        const d = new Date();
-        d.setDate(d.getDate() - d.getDay()); // Sunday
-        return d;
-      };
-
-      const startOfWeek = getStartOfWeek();
       const child = children.find(c => c.id === childId);
-      const resetTimestamp = child?.path_reset_timestamp ? new Date(child.path_reset_timestamp) : new Date(0);
-      const effectiveStartDate = resetTimestamp > startOfWeek ? resetTimestamp : startOfWeek;
+      const resetTimestamp = child?.path_reset_timestamp ? new Date(child.path_reset_timestamp) : new Date(child?.created_at || 0);
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const earliestDate = startOfWeek < sevenDaysAgo ? startOfWeek : sevenDaysAgo;
-      
+      const earliestDate = resetTimestamp < sevenDaysAgo ? resetTimestamp : sevenDaysAgo;
+
       const effectiveFetchDateStr = `${earliestDate.getFullYear()}-${String(earliestDate.getMonth() + 1).padStart(2, '0')}-${String(earliestDate.getDate()).padStart(2, '0')}`;
 
       const { data: recordsData, error: recordsError } = await supabase
@@ -247,20 +239,12 @@ const DailyEvaluation = () => {
     return <div className="flex gap-2 justify-center my-3">{marks}</div>;
   };
 
-  const getStartOfWeekDisplay = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay()); // Sunday
-    d.setHours(0, 0, 0, 0);
-    return d;
-  };
-  const startOfWeekDisplay = getStartOfWeekDisplay();
-  const resetTimestampDisplay = activeChild?.path_reset_timestamp ? new Date(activeChild.path_reset_timestamp) : new Date(0);
-  const effectiveStartDateDisplay = resetTimestampDisplay > startOfWeekDisplay ? resetTimestampDisplay : startOfWeekDisplay;
+  const resetTimestampDisplay = activeChild?.path_reset_timestamp ? new Date(activeChild.path_reset_timestamp) : new Date(activeChild?.created_at || 0);
 
   // تحويل تاريخ البداية الفعلي إلى نص بتنسيق YYYY-MM-DD للمقارنة مع عمود date في قاعدة البيانات
   const toDateStr = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const effectiveStartStr = toDateStr(effectiveStartDateDisplay);
+  const effectiveStartStr = toDateStr(resetTimestampDisplay);
 
   let validStars = 0;
   let validCrosses = 0;

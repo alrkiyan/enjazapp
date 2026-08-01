@@ -156,13 +156,15 @@ const KioskDisplay = () => {
         .in('child_id', childIds);
       if (linkErr) throw linkErr;
 
-      // جلب التقييمات للـ 7 أيام أو من بداية الأسبوع
-      const startOfWeek = new Date();
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-      
+      // جلب التقييمات للـ 7 أيام أو منذ آخر تصفير للمسار (أيهما أبعد)
       const windowStartDate = new Date(daysWindow[0].date);
-      const fetchStartDate = startOfWeek < windowStartDate ? startOfWeek : windowStartDate;
+      const resetTimestamps = childrenData.map(c =>
+        c.path_reset_timestamp ? new Date(c.path_reset_timestamp) : new Date(c.created_at || 0)
+      );
+      const earliestReset = resetTimestamps.length > 0
+        ? new Date(Math.min(...resetTimestamps.map(d => d.getTime())))
+        : windowStartDate;
+      const fetchStartDate = earliestReset < windowStartDate ? earliestReset : windowStartDate;
       const startDateStr = `${fetchStartDate.getFullYear()}-${String(fetchStartDate.getMonth() + 1).padStart(2, '0')}-${String(fetchStartDate.getDate()).padStart(2, '0')}`;
       
       const endDate = daysWindow[daysWindow.length - 1].date;
@@ -246,22 +248,13 @@ const KioskDisplay = () => {
   const activeAchIds = childAchievements.filter(ca => ca.child_id === activeChild.id).map(ca => ca.achievement_id);
   const activeAchievements = achievements.filter(a => activeAchIds.includes(a.id));
 
-  // حساب تقدم المسار للابن الحالي
-  const getStartOfWeek = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay()); // Sunday
-    d.setHours(0, 0, 0, 0);
-    return d;
-  };
-
-  const startOfWeek = getStartOfWeek();
-  const resetTimestamp = activeChild.path_reset_timestamp ? new Date(activeChild.path_reset_timestamp) : new Date(0);
-  const effectiveStartDate = resetTimestamp > startOfWeek ? resetTimestamp : startOfWeek;
+  // حساب تقدم المسار للابن الحالي — منذ آخر تصفير يدوي فقط (أو منذ إنشاء الابن إن لم يُصفَّر أبداً)
+  const resetTimestamp = activeChild.path_reset_timestamp ? new Date(activeChild.path_reset_timestamp) : new Date(activeChild.created_at || 0);
 
   // تحويل تاريخ البداية الفعلي إلى نص YYYY-MM-DD للمقارنة مع عمود date
   const toDateStr = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const effectiveStartStr = toDateStr(effectiveStartDate);
+  const effectiveStartStr = toDateStr(resetTimestamp);
 
   let validStars = 0;
   let validCrosses = 0;
