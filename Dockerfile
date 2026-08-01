@@ -1,13 +1,18 @@
 # Stage 1: Build the app
 FROM node:22-alpine AS builder
 
+# Bun is the package manager/script runner for this project (bun.lock is the
+# only lockfile); Node stays the runtime that actually executes vite via its
+# shebang when `bun run build` invokes it.
+COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
+
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY package.json package-lock.json ./
+COPY package.json bun.lock ./
 
 # Install dependencies
-RUN npm ci
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -22,7 +27,7 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 # Build the app
-RUN npm run build
+RUN bun run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
