@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti';
 import { Star, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import SafeImg from '../../components/ui/SafeImg';
+import RabbitImg from '../../components/ui/RabbitImg';
 
 const getToday = () => {
   const d = new Date();
@@ -343,7 +344,7 @@ const DailyEvaluation = () => {
                       }}
                       transition={{ type: "spring", stiffness: 50, damping: 10 }}
                     >
-                      <img src="/assets/img/Rabbit Kick Scooter.svg" alt="Rabbit" className="w-full h-full object-contain drop-shadow-md" style={{ transform: 'scaleX(-1)' }} />
+                      <RabbitImg hue={activeChild.rabbit_hue} alt="Rabbit" className="w-full h-full object-contain drop-shadow-md" style={{ transform: 'scaleX(-1)' }} />
                     </motion.div>
                   </div>
                 </div>

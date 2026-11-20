@@ -4,8 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { Pencil, Trash2, Plus, Upload } from 'lucide-react';
+import { Pencil, Trash2, Plus, Upload, Dices } from 'lucide-react';
 import SafeImg from '../../components/ui/SafeImg';
+import RabbitImg from '../../components/ui/RabbitImg';
+import { pickDistinctHue } from '../../lib/rabbitColor';
 
 const ChildrenManager = () => {
   const { user } = useAuth();
@@ -83,7 +85,7 @@ const ChildrenManager = () => {
         }
         const { error } = await supabase
           .from('children')
-          .insert([{ name: formData.name, avatar_url: finalAvatarUrl, reward_image_url: finalRewardUrl, kiosk_duration: formData.kiosk_duration, weekly_star_goal: formData.weekly_star_goal, parent_id: user.id }]);
+          .insert([{ name: formData.name, avatar_url: finalAvatarUrl, reward_image_url: finalRewardUrl, kiosk_duration: formData.kiosk_duration, weekly_star_goal: formData.weekly_star_goal, parent_id: user.id, rabbit_hue: pickDistinctHue(children.map(c => c.rabbit_hue)) }]);
         if (error) throw error;
       }
       resetForm();
@@ -110,6 +112,20 @@ const ChildrenManager = () => {
     setEditingId(child.id);
     setFile(null);
     setRewardFile(null);
+  };
+
+  // لون أرنب جديد للطفل، بعيد عن لونه الحالي وألوان إخوته
+  const handleRerollRabbit = async (child) => {
+    const siblingHues = children.filter(c => c.id !== child.id).map(c => c.rabbit_hue);
+    const rabbit_hue = pickDistinctHue(siblingHues, child.rabbit_hue);
+    try {
+      const { error } = await supabase.from('children').update({ rabbit_hue }).eq('id', child.id);
+      if (error) throw error;
+      setChildren(prev => prev.map(c => (c.id === child.id ? { ...c, rabbit_hue } : c)));
+    } catch (error) {
+      console.error('Error changing rabbit color:', error);
+      alert('حدث خطأ أثناء تغيير لون الأرنب');
+    }
   };
 
   const handleDelete = async (id) => {
@@ -286,7 +302,15 @@ const ChildrenManager = () => {
               </div>
               <h3 className="text-2xl font-bold text-[#352c3c]">{child.name}</h3>
               <p className="text-sm text-[#a99c92] font-bold">مدة العرض بالشاشة: {child.kiosk_duration || 10} ثواني</p>
-              
+
+              <div className="flex items-center gap-3">
+                <RabbitImg hue={child.rabbit_hue} alt={`أرنب ${child.name}`} className="w-16 h-16 object-contain" style={{ transform: 'scaleX(-1)' }} />
+                <Button variant="outline" className="px-3 text-sm whitespace-nowrap flex items-center gap-2" onClick={() => handleRerollRabbit(child)} title="تغيير لون الأرنب">
+                  <Dices size={18} />
+                  لون جديد للأرنب
+                </Button>
+              </div>
+
               <div className="flex gap-2 w-full mt-2">
                 <Button variant="outline" className="flex-1 text-[#f0a63e] border-[#f0a63e] hover:bg-[#f0a63e]/10 whitespace-nowrap px-2" onClick={() => handleResetPath(child.id)}>
                   تصفير المسار

@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS children (
   kiosk_duration INTEGER DEFAULT 10,
   weekly_star_goal INTEGER DEFAULT 10,
   path_reset_timestamp TIMESTAMP WITH TIME ZONE,
+  -- لون فرو أرنب السكوتر (Hue 0–359)؛ عشوائي ويتجنّب الأصفر 46°–75°
+  rabbit_hue SMALLINT DEFAULT (((76 + floor(random() * 330))::int % 360)::smallint)
+    CONSTRAINT children_rabbit_hue_range CHECK (rabbit_hue BETWEEN 0 AND 359),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
