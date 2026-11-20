@@ -18,8 +18,15 @@ const ChildrenManager = () => {
   const [file, setFile] = useState(null);
   const [rewardFile, setRewardFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const fileInputRef = useRef(null);
   const rewardInputRef = useRef(null);
+  const formCardRef = useRef(null);
+
+  // مع وجود أبناء يبقى النموذج مخفياً حتى يُضغط "إضافة ابن جديد" أو زر التعديل
+  const hasChildren = children.length > 0;
+  const isFormVisible = Boolean(editingId) || showAddForm || (!loading && !hasChildren);
+  const canAddChild = children.length < 5;
 
   useEffect(() => {
     fetchChildren();
@@ -101,6 +108,7 @@ const ChildrenManager = () => {
   const resetForm = () => {
     setFormData({ name: '', avatar_url: '', reward_image_url: '', kiosk_duration: 10, weekly_star_goal: 10 });
     setEditingId(null);
+    setShowAddForm(false);
     setFile(null);
     setRewardFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -110,8 +118,16 @@ const ChildrenManager = () => {
   const handleEdit = (child) => {
     setFormData({ name: child.name, avatar_url: child.avatar_url || '', reward_image_url: child.reward_image_url || '', kiosk_duration: child.kiosk_duration || 10, weekly_star_goal: child.weekly_star_goal || 10 });
     setEditingId(child.id);
+    setShowAddForm(false);
     setFile(null);
     setRewardFile(null);
+    // النموذج أعلى الصفحة وبطاقات الأبناء أسفلها
+    requestAnimationFrame(() => formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
+  const openAddForm = () => {
+    resetForm();
+    setShowAddForm(true);
   };
 
   // لون أرنب جديد للطفل، بعيد عن لونه الحالي وألوان إخوته
@@ -160,12 +176,21 @@ const ChildrenManager = () => {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-[#352c3c]">إدارة الأبناء</h1>
-        <span className="bg-[#49b5d0]/20 text-[#49b5d0] px-4 py-2 rounded-full font-bold">
-          {children.length} / 5 أطفال
-        </span>
+        <div className="flex items-center gap-3">
+          {hasChildren && !isFormVisible && canAddChild && (
+            <Button variant="primary" className="gap-2 whitespace-nowrap" onClick={openAddForm}>
+              <Plus size={20} />
+              <span>إضافة ابن جديد</span>
+            </Button>
+          )}
+          <span className="bg-[#49b5d0]/20 text-[#49b5d0] px-4 py-2 rounded-full font-bold whitespace-nowrap">
+            {children.length} / 5 أطفال
+          </span>
+        </div>
       </div>
 
-      <Card>
+      {isFormVisible && (
+      <Card ref={formCardRef}>
         <h2 className="text-xl font-bold text-[#f0a63e] mb-4">
           {editingId ? 'تعديل بيانات الابن' : 'إضافة ابن جديد'}
         </h2>
@@ -280,7 +305,7 @@ const ChildrenManager = () => {
                 </>
               )}
             </Button>
-            {editingId && (
+            {(editingId || hasChildren) && (
               <Button type="button" variant="outline" onClick={resetForm} disabled={isUploading} className="flex-1">
                 إلغاء
               </Button>
@@ -288,6 +313,7 @@ const ChildrenManager = () => {
           </div>
         </form>
       </Card>
+      )}
 
       {loading ? (
         <div className="text-center text-[#a99c92] font-bold">جاري التحميل...</div>
