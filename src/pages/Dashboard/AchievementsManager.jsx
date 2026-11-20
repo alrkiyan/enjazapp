@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Pencil, Trash2, Plus, Check, Star, Upload } from 'lucide-react';
+import SafeImg from '../../components/ui/SafeImg';
 
 const iconModules = import.meta.glob('/public/assets/icons/*.{png,jpg,jpeg,svg,gif}', { eager: true });
 const AVAILABLE_ICONS = Object.keys(iconModules).map(path => path.replace('/public', ''));
@@ -201,7 +202,7 @@ const AchievementsManager = () => {
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
                       setFile(e.target.files[0]);
@@ -245,11 +246,7 @@ const AchievementsManager = () => {
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-[#faece3] flex items-center justify-center p-2">
-                    {ach.icon_url ? (
-                      <img src={ach.icon_url} alt={ach.title} className="max-w-full max-h-full object-contain" />
-                    ) : (
-                      <Star size={32} className="text-[#f0a63e]" />
-                    )}
+                    <SafeImg src={ach.icon_url} alt={ach.title} className="max-w-full max-h-full object-contain" fallback={<Star size={32} className="text-[#f0a63e]" />} />
                   </div>
                   <h3 className="text-2xl font-bold text-[#352c3c]">{ach.title}</h3>
                 </div>

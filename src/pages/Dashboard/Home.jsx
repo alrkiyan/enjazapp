@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSuperAdmin as checkSuperAdmin } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -13,7 +13,7 @@ const Home = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
-  const isSuperAdmin = user?.user_metadata?.is_super_admin === true;
+  const isSuperAdmin = checkSuperAdmin(user);
 
   // Account state
   const [email, setEmail] = useState(user?.email || '');

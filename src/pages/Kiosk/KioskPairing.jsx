@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { getKioskClient } from '../../lib/supabase';
+
+const kiosk = getKioskClient();
 import { QRCodeSVG } from 'qrcode.react';
 
 const getDeviceInfo = () => {
@@ -33,7 +35,7 @@ const KioskPairing = () => {
     if (!sessionId) return;
 
     // الاستماع عبر Realtime لتغير parent_id
-    const channel = supabase
+    const channel = kiosk
       .channel('kiosk_pairing_channel')
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -51,16 +53,23 @@ const KioskPairing = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      kiosk.removeChannel(channel);
     };
   }, [sessionId, navigate]);
 
   const generateCode = async () => {
     try {
+      // الشاشة تدخل بحساب مجهول خاص بها (مرة واحدة، والجلسة محفوظة)
+      const { data: { session } } = await kiosk.auth.getSession();
+      if (!session) {
+        const { error: signInError } = await kiosk.auth.signInAnonymously();
+        if (signInError) throw signInError;
+      }
+
       // توليد كود 6 أرقام عشوائي
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
-      const { data, error } = await supabase
+      const { data, error } = await kiosk
         .from('kiosk_sessions')
         .insert([{ code, device_info: getDeviceInfo() }])
         .select()

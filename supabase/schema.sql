@@ -3,6 +3,8 @@
 -- شغّل هذا الملف مرة واحدة على قاعدة بيانات Supabase فارغة عبر SQL Editor.
 -- يجمع كل ملفات supabase/*.sql السابقة في مصدر واحد بالحالة النهائية:
 -- الجداول + RLS + السياسات + الدوال والـTriggers + التخزين + دوال الأدمن + Realtime.
+-- يتضمّن التحصين الأمني 2026-11-20 (migrations/20261120_security_hardening.sql).
+-- متطلب: ENABLE_ANONYMOUS_USERS=true في Supabase (لشاشات Kiosk).
 -- ============================================================================
 
 -- الامتدادات المطلوبة
@@ -60,8 +62,12 @@ CREATE TABLE IF NOT EXISTS kiosk_sessions (
   code TEXT NOT NULL UNIQUE,
   parent_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   device_info TEXT DEFAULT 'غير معروف',
+  -- هوية الشاشة (حساب مجهول Anonymous sign-in) — تقرأ بيانات الأب المرتبط فقط
+  kiosk_uid UUID DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+CREATE INDEX IF NOT EXISTS kiosk_sessions_kiosk_uid_idx ON kiosk_sessions (kiosk_uid);
+CREATE INDEX IF NOT EXISTS kiosk_sessions_parent_id_idx ON kiosk_sessions (parent_id);
 
 -- ============================================================================
 -- 2) تفعيل RLS (Row Level Security)
@@ -72,6 +78,50 @@ ALTER TABLE child_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_records      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kiosk_sessions     ENABLE ROW LEVEL SECURITY;
 
+-- دوال الشاشة (تُستخدم في السياسات أدناه، فيجب تعريفها قبلها)
+-- معرّفات الآباء المرتبطين بشاشة المستخدم الحالي (SECURITY DEFINER لتفادي تداخل RLS)
+CREATE OR REPLACE FUNCTION public.kiosk_parent_ids()
+RETURNS SETOF uuid
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT ks.parent_id FROM public.kiosk_sessions ks
+  WHERE ks.kiosk_uid = auth.uid() AND ks.parent_id IS NOT NULL;
+$$;
+
+-- ربط شاشة بكود من حساب الأب
+CREATE OR REPLACE FUNCTION public.kiosk_claim(p_code TEXT)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF auth.uid() IS NULL OR (auth.jwt() ->> 'is_anonymous')::boolean IS TRUE THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  UPDATE public.kiosk_sessions
+  SET parent_id = auth.uid()
+  WHERE code = p_code
+    AND parent_id IS NULL
+    AND created_at > now() - interval '24 hours'
+  RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'الكود غير صحيح أو انتهت صلاحيته';
+  END IF;
+
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.kiosk_claim(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.kiosk_claim(TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.kiosk_parent_ids() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.kiosk_parent_ids() TO authenticated;
+
 -- ============================================================================
 -- 3) سياسات الأمان (Policies)
 -- ============================================================================
@@ -81,20 +131,12 @@ CREATE POLICY "Parents can view their own children"   ON children FOR SELECT USI
 CREATE POLICY "Parents can insert their own children" ON children FOR INSERT WITH CHECK (auth.uid() = parent_id);
 CREATE POLICY "Parents can update their own children" ON children FOR UPDATE USING (auth.uid() = parent_id);
 CREATE POLICY "Parents can delete their own children" ON children FOR DELETE USING (auth.uid() = parent_id);
--- الأطفال — الشاشة (قراءة فقط لمن لديه جلسة شاشة نشطة)
-CREATE POLICY "Kiosk can view children" ON children FOR SELECT USING (
-  parent_id IN (SELECT parent_id FROM kiosk_sessions)
-);
 
 -- الإنجازات — الأب
 CREATE POLICY "Parents can view their own achievements"   ON achievements FOR SELECT USING (auth.uid() = parent_id);
 CREATE POLICY "Parents can insert their own achievements" ON achievements FOR INSERT WITH CHECK (auth.uid() = parent_id);
 CREATE POLICY "Parents can update their own achievements" ON achievements FOR UPDATE USING (auth.uid() = parent_id);
 CREATE POLICY "Parents can delete their own achievements" ON achievements FOR DELETE USING (auth.uid() = parent_id);
--- الإنجازات — الشاشة
-CREATE POLICY "Kiosk can view achievements" ON achievements FOR SELECT USING (
-  parent_id IN (SELECT parent_id FROM kiosk_sessions)
-);
 
 -- ربط الإنجازات — الأب
 CREATE POLICY "Parents can view child_achievements" ON child_achievements FOR SELECT USING (
@@ -105,10 +147,6 @@ CREATE POLICY "Parents can insert child_achievements" ON child_achievements FOR 
 );
 CREATE POLICY "Parents can delete child_achievements" ON child_achievements FOR DELETE USING (
   EXISTS (SELECT 1 FROM children WHERE children.id = child_id AND children.parent_id = auth.uid())
-);
--- ربط الإنجازات — الشاشة
-CREATE POLICY "Kiosk can view child_achievements" ON child_achievements FOR SELECT USING (
-  child_id IN (SELECT id FROM children WHERE parent_id IN (SELECT parent_id FROM kiosk_sessions))
 );
 
 -- التقييم اليومي — الأب
@@ -124,24 +162,52 @@ CREATE POLICY "Parents can update daily_records" ON daily_records FOR UPDATE USI
 CREATE POLICY "Parents can delete daily_records" ON daily_records FOR DELETE USING (
   EXISTS (SELECT 1 FROM children WHERE children.id = daily_records.child_id AND children.parent_id = auth.uid())
 );
--- التقييم اليومي — الشاشة
-CREATE POLICY "Kiosk can view daily_records" ON daily_records FOR SELECT USING (
-  child_id IN (SELECT id FROM children WHERE parent_id IN (SELECT parent_id FROM kiosk_sessions))
-);
 
--- جلسات الشاشة
-CREATE POLICY "Anyone can insert kiosk_sessions"  ON kiosk_sessions FOR INSERT WITH CHECK (true);
-CREATE POLICY "Anyone can view kiosk_sessions"    ON kiosk_sessions FOR SELECT USING (true);
-CREATE POLICY "Parents can update kiosk_sessions" ON kiosk_sessions FOR UPDATE USING (true);
-CREATE POLICY "Parents can delete kiosk_sessions" ON kiosk_sessions FOR DELETE USING (auth.uid() = parent_id);
+-- الشاشة: قراءة بيانات الأب المرتبط بهوية هذه الشاشة فقط
+CREATE POLICY "Kiosk can view children" ON public.children
+  FOR SELECT TO authenticated
+  USING (parent_id IN (SELECT public.kiosk_parent_ids()));
+
+CREATE POLICY "Kiosk can view achievements" ON public.achievements
+  FOR SELECT TO authenticated
+  USING (parent_id IN (SELECT public.kiosk_parent_ids()));
+
+CREATE POLICY "Kiosk can view child_achievements" ON public.child_achievements
+  FOR SELECT TO authenticated
+  USING (child_id IN (SELECT c.id FROM public.children c WHERE c.parent_id IN (SELECT public.kiosk_parent_ids())));
+
+CREATE POLICY "Kiosk can view daily_records" ON public.daily_records
+  FOR SELECT TO authenticated
+  USING (child_id IN (SELECT c.id FROM public.children c WHERE c.parent_id IN (SELECT public.kiosk_parent_ids())));
+
+
+-- جلسات الشاشة (الربط عبر kiosk_claim() فقط — لا سياسة UPDATE)
+CREATE POLICY "Kiosk can create its session" ON public.kiosk_sessions
+  FOR INSERT TO authenticated
+  WITH CHECK (kiosk_uid = auth.uid() AND parent_id IS NULL);
+CREATE POLICY "Kiosk or parent can view session" ON public.kiosk_sessions
+  FOR SELECT TO authenticated
+  USING (kiosk_uid = auth.uid() OR parent_id = auth.uid());
+CREATE POLICY "Kiosk or parent can delete session" ON public.kiosk_sessions
+  FOR DELETE TO authenticated
+  USING (kiosk_uid = auth.uid() OR parent_id = auth.uid());
+-- لا سياسة UPDATE: الربط عبر kiosk_claim() فقط
+
 
 -- ============================================================================
 -- 4) الدوال والـTriggers
 -- إدخال 3 إنجازات افتراضية عند تسجيل أب جديد
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 BEGIN
+  IF new.is_anonymous IS TRUE THEN
+    RETURN new;
+  END IF;
+
   INSERT INTO public.achievements (title, icon_url, parent_id)
   VALUES
     ('الصلاة في وقتها', '/assets/icons/prayer-mat.png', new.id),
@@ -149,7 +215,7 @@ BEGIN
     ('تفريش الأسنان', '/assets/icons/toothbrush.png', new.id);
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -160,7 +226,15 @@ CREATE TRIGGER on_auth_user_created
 -- 5) دوال السوبر أدمن لإدارة المستخدمين (SECURITY DEFINER)
 -- ============================================================================
 
--- جلب قائمة المستخدمين
+-- صلاحية السوبر أدمن من app_metadata (يضبطها السيرفر فقط)
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS boolean
+LANGUAGE sql STABLE
+SET search_path = ''
+AS $$
+  SELECT COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_super_admin')::boolean, false);
+$$;
+
 CREATE OR REPLACE FUNCTION public.admin_get_users()
 RETURNS TABLE (
   id UUID,
@@ -169,9 +243,12 @@ RETURNS TABLE (
   last_sign_in_at TIMESTAMP WITH TIME ZONE,
   is_banned BOOLEAN,
   is_super_admin BOOLEAN
-) AS $$
+)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 BEGIN
-  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+  IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
@@ -182,17 +259,20 @@ BEGIN
     u.created_at,
     u.last_sign_in_at,
     (u.banned_until IS NOT NULL AND u.banned_until > now()) AS is_banned,
-    (u.raw_user_meta_data ->> 'is_super_admin')::boolean AS is_super_admin
+    COALESCE((u.raw_app_meta_data ->> 'is_super_admin')::boolean, false) AS is_super_admin
   FROM auth.users u
+  WHERE u.is_anonymous IS NOT TRUE
   ORDER BY u.created_at DESC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- حظر / فك حظر المستخدم
 CREATE OR REPLACE FUNCTION public.admin_toggle_user_ban(target_uid UUID, ban BOOLEAN)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 BEGIN
-  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+  IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
@@ -206,13 +286,15 @@ BEGIN
     UPDATE auth.users SET banned_until = NULL WHERE id = target_uid;
   END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- حذف المستخدم نهائياً
 CREATE OR REPLACE FUNCTION public.admin_delete_user(target_uid UUID)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 BEGIN
-  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+  IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
@@ -222,31 +304,29 @@ BEGIN
 
   DELETE FROM auth.users WHERE id = target_uid;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- تغيير كلمة مرور مستخدم (من قِبَل السوبر أدمن)
 CREATE OR REPLACE FUNCTION public.admin_change_user_password(target_uid UUID, new_password TEXT)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 BEGIN
-  -- التحقق من صلاحية السوبر أدمن
-  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+  IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
-  -- لا يُسمح بتغيير كلمة مرور السوبر أدمن نفسه عبر هذه الدالة
   IF target_uid = auth.uid() THEN
     RAISE EXCEPTION 'استخدم خيار "تغيير كلمة المرور" في إعدادات حسابك الشخصي.';
   END IF;
 
-  -- التحقق من الحد الأدنى لطول كلمة المرور
   IF length(new_password) < 6 THEN
     RAISE EXCEPTION 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.';
   END IF;
 
-  -- تحديث كلمة المرور المشفّرة مباشرةً في جدول auth.users
   UPDATE auth.users
   SET
-    encrypted_password = crypt(new_password, gen_salt('bf')),
+    encrypted_password = extensions.crypt(new_password, extensions.gen_salt('bf')),
     updated_at = now()
   WHERE id = target_uid;
 
@@ -254,29 +334,28 @@ BEGIN
     RAISE EXCEPTION 'المستخدم غير موجود.';
   END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- ============================================================================
--- 5b) دوال الإحصائيات
--- ============================================================================
-
--- إحصائيات المنصة الكاملة (سوبر أدمن فقط)
 CREATE OR REPLACE FUNCTION public.admin_get_platform_stats()
-RETURNS JSON AS $$
+RETURNS JSON
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 DECLARE
   result JSON;
 BEGIN
-  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+  IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
   SELECT json_build_object(
     'families_count', (
       SELECT COUNT(*) FROM auth.users
-      WHERE (raw_user_meta_data->>'is_super_admin')::boolean IS NOT TRUE
+      WHERE (raw_app_meta_data->>'is_super_admin')::boolean IS NOT TRUE
+        AND is_anonymous IS NOT TRUE
     ),
     'total_achievements', (SELECT COUNT(*) FROM public.achievements),
-    'total_kiosks',       (SELECT COUNT(*) FROM public.kiosk_sessions),
+    'total_kiosks',       (SELECT COUNT(*) FROM public.kiosk_sessions WHERE parent_id IS NOT NULL),
     'families', (
       SELECT COALESCE(json_agg(
         json_build_object(
@@ -303,19 +382,22 @@ BEGIN
         ) ORDER BY u.created_at DESC
       ), '[]'::json)
       FROM auth.users u
-      WHERE (u.raw_user_meta_data->>'is_super_admin')::boolean IS NOT TRUE
+      WHERE (u.raw_app_meta_data->>'is_super_admin')::boolean IS NOT TRUE
+        AND u.is_anonymous IS NOT TRUE
     )
   ) INTO result;
 
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- فك ربط شاشة بواسطة السوبر أدمن
 CREATE OR REPLACE FUNCTION public.admin_unlink_kiosk(session_id UUID)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
 BEGIN
-  IF (auth.jwt() -> 'user_metadata' ->> 'is_super_admin')::boolean IS NOT TRUE THEN
+  IF NOT public.is_super_admin() THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
@@ -325,7 +407,7 @@ BEGIN
     RAISE EXCEPTION 'الجلسة غير موجودة.';
   END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- إحصائيات الأبناء للوالد الحالي
 CREATE OR REPLACE FUNCTION public.get_parent_child_stats()
@@ -398,19 +480,32 @@ BEGIN
 
   RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, extensions;
 
 -- ============================================================================
 -- 6) التخزين (Storage) — حاوية uploads العامة + سياساتها
 -- ============================================================================
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('uploads', 'uploads', true)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('uploads', 'uploads', true, 5242880, ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 ON CONFLICT (id) DO NOTHING;
 
 CREATE POLICY "Public Access"     ON storage.objects FOR SELECT USING ( bucket_id = 'uploads' );
-CREATE POLICY "Auth Users Upload" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'uploads' AND auth.role() = 'authenticated' );
-CREATE POLICY "Auth Users Update" ON storage.objects FOR UPDATE USING ( bucket_id = 'uploads' AND auth.role() = 'authenticated' );
-CREATE POLICY "Auth Users Delete" ON storage.objects FOR DELETE USING ( bucket_id = 'uploads' AND auth.role() = 'authenticated' );
+-- المسار: avatars/<uid>/<file> أو icons/<uid>/<file>
+CREATE POLICY "Users upload to own folder" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'uploads'
+    AND (storage.foldername(name))[1] IN ('avatars', 'icons')
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+    AND (auth.jwt() ->> 'is_anonymous')::boolean IS NOT TRUE
+  );
+CREATE POLICY "Users update own files" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'uploads' AND (storage.foldername(name))[2] = (SELECT auth.uid())::text)
+  WITH CHECK (bucket_id = 'uploads' AND (storage.foldername(name))[2] = (SELECT auth.uid())::text);
+CREATE POLICY "Users delete own files" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'uploads' AND (storage.foldername(name))[2] = (SELECT auth.uid())::text);
 
 -- ============================================================================
 -- 7) تفعيل Realtime للشاشة الرئيسية (TV Kiosk)
@@ -438,7 +533,7 @@ BEGIN
     VALUES (
       '00000000-0000-0000-0000-000000000000', super_admin_id, 'authenticated', 'authenticated',
       'saleh@isaleh.dev', crypt('Saleh@123', gen_salt('bf')), now(),
-      '{"provider":"email","providers":["email"]}', '{"is_super_admin": true}', now(), now(),
+      '{"provider":"email","providers":["email"],"is_super_admin":true}', '{}', now(), now(),
       '', '', '', ''
     );
 

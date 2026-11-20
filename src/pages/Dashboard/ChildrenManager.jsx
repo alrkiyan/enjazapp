@@ -5,6 +5,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Pencil, Trash2, Plus, Upload } from 'lucide-react';
+import SafeImg from '../../components/ui/SafeImg';
 
 const ChildrenManager = () => {
   const { user } = useAuth();
@@ -208,7 +209,7 @@ const ChildrenManager = () => {
                     type="file" 
                     ref={fileInputRef} 
                     className="hidden" 
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
                         setFile(e.target.files[0]);
@@ -237,7 +238,7 @@ const ChildrenManager = () => {
                     type="file" 
                     ref={rewardInputRef} 
                     className="hidden" 
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
                         setRewardFile(e.target.files[0]);
@@ -281,11 +282,7 @@ const ChildrenManager = () => {
           {children.map((child) => (
             <Card key={child.id} className="flex flex-col items-center text-center gap-4 hover:-translate-y-1 transition-transform">
               <div className="w-24 h-24 rounded-full border-4 border-[#faece3] bg-[#f0e6de] overflow-hidden flex items-center justify-center">
-                {child.avatar_url ? (
-                  <img src={child.avatar_url} alt={child.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-4xl text-[#a99c92]">{child.name.charAt(0)}</span>
-                )}
+                <SafeImg src={child.avatar_url} alt={child.name} className="w-full h-full object-cover" fallback={<span className="text-4xl text-[#a99c92]">{child.name.charAt(0)}</span>} />
               </div>
               <h3 className="text-2xl font-bold text-[#352c3c]">{child.name}</h3>
               <p className="text-sm text-[#a99c92] font-bold">مدة العرض بالشاشة: {child.kiosk_duration || 10} ثواني</p>

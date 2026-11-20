@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button';
 import confetti from 'canvas-confetti';
 import { Star, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import SafeImg from '../../components/ui/SafeImg';
 
 const getToday = () => {
   const d = new Date();
@@ -285,11 +286,7 @@ const DailyEvaluation = () => {
                 }`}
               >
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-[#f0e6de] flex items-center justify-center shrink-0">
-                  {child.avatar_url ? (
-                    <img src={child.avatar_url} alt={child.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-sm">{child.name.charAt(0)}</span>
-                  )}
+                  <SafeImg src={child.avatar_url} alt={child.name} className="w-full h-full object-cover" fallback={<span className="text-sm">{child.name.charAt(0)}</span>} />
                 </div>
                 {child.name}
               </button>
@@ -362,7 +359,7 @@ const DailyEvaluation = () => {
                   }}
                   transition={{ type: "spring", stiffness: 50, damping: 10 }}
                 >
-                  <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
+                  <SafeImg src={activeChild.reward_image_url} fallbackSrc="/assets/img/medal.png" alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
                 </motion.div>
               </div>
             </Card>
@@ -383,11 +380,7 @@ const DailyEvaluation = () => {
                 return (
                   <Card key={ach.id} className="flex flex-col gap-4 items-center text-center">
                     <div className="w-20 h-20 rounded-3xl bg-[#faece3] flex items-center justify-center p-3 shadow-inner">
-                      {ach.icon_url ? (
-                        <img src={ach.icon_url} alt={ach.title} className="max-w-full max-h-full object-contain drop-shadow-md" />
-                      ) : (
-                        <Star size={40} className="text-[#f0a63e]" />
-                      )}
+                      <SafeImg src={ach.icon_url} alt={ach.title} className="max-w-full max-h-full object-contain drop-shadow-md" fallback={<Star size={40} className="text-[#f0a63e]" />} />
                     </div>
                     
                     <h3 className="text-2xl font-bold text-[#352c3c]">{ach.title}</h3>

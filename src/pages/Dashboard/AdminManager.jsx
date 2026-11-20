@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createClient } from '@supabase/supabase-js';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSuperAdmin as checkSuperAdmin } from '../../lib/supabase';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -165,7 +165,7 @@ const AdminManager = () => {
   const [pwChangeSuccess, setPwChangeSuccess] = useState('');
 
   // حماية إضافية للواجهة
-  const isSuperAdmin = user?.user_metadata?.is_super_admin === true;
+  const isSuperAdmin = checkSuperAdmin(user);
 
   useEffect(() => {
     if (isSuperAdmin) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import Card from './Card';
 import { Star, X, TrendingUp, TrendingDown, Trophy, Calendar } from 'lucide-react';
+import SafeImg from './SafeImg';
 
 /* ─── helpers ─────────────────────────────────────────────────── */
 const fmtDate = (d) =>
@@ -40,11 +41,7 @@ const AchBar = ({ ach, maxStars, rank, total }) => {
 
         {/* Icon + title */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {ach.icon_url ? (
-            <img src={ach.icon_url} className="w-6 h-6 object-contain shrink-0" alt="" />
-          ) : (
-            <Star size={15} className="text-[#f0a63e] shrink-0" />
-          )}
+          <SafeImg src={ach.icon_url} className="w-6 h-6 object-contain shrink-0" fallback={<Star size={15} className="text-[#f0a63e] shrink-0" />} />
           <span className="text-sm font-bold text-[#352c3c] truncate">{ach.title}</span>
         </div>
 
@@ -143,9 +140,7 @@ const ChildPanel = ({ child }) => {
                     <span className="w-5 h-5 flex-none rounded-full bg-[#488b40] text-white text-xs font-black flex items-center justify-center">
                       {i + 1}
                     </span>
-                    {a.icon_url && (
-                      <img src={a.icon_url} className="w-4 h-4 object-contain shrink-0" alt="" />
-                    )}
+                    <SafeImg src={a.icon_url} className="w-4 h-4 object-contain shrink-0" />
                     <span className="text-[#352c3c] font-bold truncate flex-1">{a.title}</span>
                     <span className="text-[#488b40] font-bold shrink-0">⭐ {a.total_stars}</span>
                   </div>
@@ -163,9 +158,7 @@ const ChildPanel = ({ child }) => {
                     <span className="w-5 h-5 flex-none rounded-full bg-[#c15b40] text-white text-xs font-black flex items-center justify-center">
                       {i + 1}
                     </span>
-                    {a.icon_url && (
-                      <img src={a.icon_url} className="w-4 h-4 object-contain shrink-0" alt="" />
-                    )}
+                    <SafeImg src={a.icon_url} className="w-4 h-4 object-contain shrink-0" />
                     <span className="text-[#352c3c] font-bold truncate flex-1">{a.title}</span>
                     <span className="text-[#c15b40] font-bold shrink-0">⭐ {a.total_stars}</span>
                   </div>
@@ -235,17 +228,15 @@ const ParentStats = () => {
                   : 'border-[#e2d5cc] bg-white text-[#a99c92] hover:border-[#49b5d0]/40'
               }`}
             >
-              {child.avatar_url ? (
-                <img
-                  src={child.avatar_url}
-                  className="w-6 h-6 rounded-full object-cover"
-                  alt=""
-                />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-[#f0e6de] flex items-center justify-center text-xs font-bold text-[#a99c92]">
-                  {child.name.charAt(0)}
-                </div>
-              )}
+              <SafeImg
+                src={child.avatar_url}
+                className="w-6 h-6 rounded-full object-cover"
+                fallback={
+                  <div className="w-6 h-6 rounded-full bg-[#f0e6de] flex items-center justify-center text-xs font-bold text-[#a99c92]">
+                    {child.name.charAt(0)}
+                  </div>
+                }
+              />
               {child.name}
             </button>
           ))}

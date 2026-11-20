@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Users, Star, LogOut, LayoutDashboard, CalendarCheck, MonitorPlay } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import ForceChangePassword from '../../components/ui/ForceChangePassword';
+import { isSuperAdmin as checkSuperAdmin } from '../../lib/supabase';
 
 const DashboardLayout = () => {
   const { signOut, user } = useAuth();
@@ -18,7 +19,7 @@ const DashboardLayout = () => {
     navigate('/login');
   };
 
-  const isSuperAdmin = user?.user_metadata?.is_super_admin === true;
+  const isSuperAdmin = checkSuperAdmin(user);
 
   const navItems = [
     { path: '/dashboard', label: 'اللوحة الرئيسية', icon: LayoutDashboard, end: true },

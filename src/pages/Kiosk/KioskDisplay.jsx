@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { getKioskClient } from '../../lib/supabase';
+
+const kiosk = getKioskClient();
 import { Star, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
+import SafeImg from '../../components/ui/SafeImg';
 const getWindowDays = () => {
   const days = [];
   const today = new Date();
@@ -43,11 +46,32 @@ const KioskDisplay = () => {
     sadAudio.current = new Audio('/assets/sounds/wah-wah-sad-sound-effect.mp3');
     
     const storedParentId = localStorage.getItem('kiosk_parent_id');
-    if (!storedParentId) {
+    const storedSessionId = localStorage.getItem('kiosk_session_id');
+    const resetPairing = () => {
+      localStorage.removeItem('kiosk_parent_id');
+      localStorage.removeItem('kiosk_session_id');
       navigate('/kiosk');
+    };
+    if (!storedParentId || !storedSessionId) {
+      resetPairing();
       return;
     }
-    setParentId(storedParentId);
+
+    // التأكد أن الجلسة ما زالت قائمة ومرتبطة بهوية هذه الشاشة؛ وإلا إعادة الربط
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await kiosk.auth.getSession();
+      const { data } = session
+        ? await kiosk.from('kiosk_sessions').select('id, parent_id').eq('id', storedSessionId).maybeSingle()
+        : { data: null };
+      if (cancelled) return;
+      if (!data || data.parent_id !== storedParentId) {
+        resetPairing();
+        return;
+      }
+      setParentId(storedParentId);
+    })();
+    return () => { cancelled = true; };
   }, [navigate]);
 
   // تحديث نافذة الأيام كل ساعة لضمان بقاء "اليوم" في المنتصف
@@ -65,7 +89,7 @@ const KioskDisplay = () => {
     fetchData();
 
     // الاستماع المباشر للإضافات على التقييمات
-    const channel = supabase
+    const channel = kiosk
       .channel('kiosk_records_channel')
       .on('postgres_changes', {
         event: 'INSERT',
@@ -103,7 +127,7 @@ const KioskDisplay = () => {
     const sessionId = localStorage.getItem('kiosk_session_id');
     let sessionChannel;
     if (sessionId) {
-      sessionChannel = supabase
+      sessionChannel = kiosk
         .channel('kiosk_session_delete')
         .on('postgres_changes', {
           event: 'DELETE',
@@ -120,8 +144,8 @@ const KioskDisplay = () => {
     }
 
     return () => {
-      supabase.removeChannel(channel);
-      if (sessionChannel) supabase.removeChannel(sessionChannel);
+      kiosk.removeChannel(channel);
+      if (sessionChannel) kiosk.removeChannel(sessionChannel);
     };
   }, [parentId]);
 
@@ -129,7 +153,7 @@ const KioskDisplay = () => {
     try {
       setLoading(true);
       // جلب بيانات الأبناء
-      const { data: childrenData, error: childErr } = await supabase
+      const { data: childrenData, error: childErr } = await kiosk
         .from('children')
         .select('*')
         .eq('parent_id', parentId)
@@ -137,7 +161,7 @@ const KioskDisplay = () => {
       if (childErr) throw childErr;
 
       // جلب جميع الإنجازات للأب
-      const { data: achData, error: achErr } = await supabase
+      const { data: achData, error: achErr } = await kiosk
         .from('achievements')
         .select('*')
         .eq('parent_id', parentId);
@@ -150,7 +174,7 @@ const KioskDisplay = () => {
 
       // جلب الروابط
       const childIds = childrenData.map(c => c.id);
-      const { data: linkData, error: linkErr } = await supabase
+      const { data: linkData, error: linkErr } = await kiosk
         .from('child_achievements')
         .select('*')
         .in('child_id', childIds);
@@ -169,7 +193,7 @@ const KioskDisplay = () => {
       
       const endDate = daysWindow[daysWindow.length - 1].date;
 
-      const { data: recordsData, error: recErr } = await supabase
+      const { data: recordsData, error: recErr } = await kiosk
         .from('daily_records')
         .select('*')
         .in('child_id', childIds)
@@ -347,7 +371,7 @@ const KioskDisplay = () => {
                  transition={{ type: "spring", stiffness: 100, damping: 15 }}
                  className="w-[clamp(15rem,40vh,25rem)] aspect-square bg-white rounded-full p-4 shadow-2xl border-8 md:border-[12px] border-[#f0a63e] flex items-center justify-center overflow-hidden"
                >
-                 <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
+                 <SafeImg src={activeChild.reward_image_url} fallbackSrc="/assets/img/medal.png" alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
                </motion.div>
                <div className="flex flex-col items-center text-center gap-4">
                  <h2 className="text-[clamp(2.5rem,8vh,5rem)] font-black text-[#f0a63e] drop-shadow-md">
@@ -364,11 +388,7 @@ const KioskDisplay = () => {
               <div className="flex flex-row items-center justify-between w-full mb-2 md:mb-4 shrink-0 h-[12vh] max-h-32 px-2 md:px-8 gap-4 md:gap-8">
                 <div className="flex items-center gap-4 md:gap-6 h-full shrink-0">
                   <div className="h-full aspect-square rounded-full border-4 border-[#faece3] bg-[#f0e6de] overflow-hidden flex items-center justify-center shadow-lg relative">
-                    {activeChild.avatar_url ? (
-                      <img src={activeChild.avatar_url} alt={activeChild.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-[clamp(2rem,8vh,5rem)] text-[#a99c92]">{activeChild.name.charAt(0)}</span>
-                    )}
+                    <SafeImg src={activeChild.avatar_url} alt={activeChild.name} className="w-full h-full object-cover" fallback={<span className="text-[clamp(2rem,8vh,5rem)] text-[#a99c92]">{activeChild.name.charAt(0)}</span>} />
                   </div>
                   <h1 className="text-[clamp(1.5rem,5vh,4rem)] font-black text-[#352c3c] drop-shadow-sm whitespace-nowrap">{activeChild.name}</h1>
                 </div>
@@ -426,7 +446,7 @@ const KioskDisplay = () => {
                     default: { type: "spring", stiffness: 50, damping: 10 }
                   }}
                 >
-                  <img src={activeChild.reward_image_url || "/assets/img/medal.png"} alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
+                  <SafeImg src={activeChild.reward_image_url} fallbackSrc="/assets/img/medal.png" alt="Medal" className={`w-full h-full rounded-full ${activeChild.reward_image_url ? 'object-cover' : 'object-contain'}`} />
                 </motion.div>
               </div>
 
@@ -457,11 +477,7 @@ const KioskDisplay = () => {
                           {/* Achievement Title Card */}
                           <div className="w-[25%] md:w-1/4 shrink-0 h-full p-0.5 md:p-1">
                             <div className="h-full bg-white rounded-xl md:rounded-2xl p-1 md:px-3 shadow-sm border-2 border-transparent group-hover:border-[#f0a63e] transition-colors flex flex-row items-center justify-start gap-1.5 md:gap-3 overflow-hidden">
-                              {ach.icon_url ? (
-                                <img src={ach.icon_url} alt={ach.title} className="h-[75%] max-h-[2.5rem] aspect-square object-contain shrink-0" />
-                              ) : (
-                                <Star className="h-[75%] max-h-[2.5rem] aspect-square text-[#f0a63e] shrink-0" />
-                              )}
+                              <SafeImg src={ach.icon_url} alt={ach.title} className="h-[75%] max-h-[2.5rem] aspect-square object-contain shrink-0" fallback={<Star className="h-[75%] max-h-[2.5rem] aspect-square text-[#f0a63e] shrink-0" />} />
                               <span className="font-bold text-[clamp(0.65rem,3.5cqh,1.1rem)] text-[#352c3c] line-clamp-2 leading-tight text-right flex-1 min-w-0 break-words">{ach.title}</span>
                             </div>
                           </div>

@@ -78,24 +78,11 @@ const KioskManager = () => {
     setSuccess(false);
 
     try {
-      // البحث عن الجلسة بالكود
-      const { data: session, error: fetchError } = await supabase
-        .from('kiosk_sessions')
-        .select('*')
-        .eq('code', code)
-        .single();
-
-      if (fetchError || !session) {
-        throw new Error('الكود غير صحيح أو انتهت صلاحيته');
+      // ربط الشاشة بالكود عبر دالة السيرفر (لا يرى الأب جلسات غيره)
+      const { error: claimError } = await supabase.rpc('kiosk_claim', { p_code: code });
+      if (claimError) {
+        throw new Error(claimError.message || 'الكود غير صحيح أو انتهت صلاحيته');
       }
-
-      // تحديث الجلسة لمعرف الأب
-      const { error: updateError } = await supabase
-        .from('kiosk_sessions')
-        .update({ parent_id: user.id })
-        .eq('id', session.id);
-
-      if (updateError) throw updateError;
 
       setSuccess(true);
       setCode('');
